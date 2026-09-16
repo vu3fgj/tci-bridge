@@ -2,32 +2,24 @@
 #pragma once
 
 #include <QObject>
-#include <QSocketNotifier>
 
-class SignalHandler final : public QObject
-{
-	Q_OBJECT
-
+class SignalHandler : public QObject {
+    Q_OBJECT
 public:
-	explicit SignalHandler(QObject *parent = nullptr);
-	~SignalHandler() override;
+    explicit SignalHandler(QObject *parent = nullptr);
+    ~SignalHandler() override;
 
-	static bool install();
+    static void setupSignalHandlers();
 
-	signals:
-		void interruptReceived();
-	void terminateReceived();
-
-private slots:
-	void handleSigInt();
-	void handleSigTerm();
+signals:
+    void quitRequested();
 
 private:
-	static void signalHandler(int signal);
-
-	static int sigintFd_[2];
-	static int sigtermFd_[2];
-
-	QSocketNotifier *sigintNotifier_ = nullptr;
-	QSocketNotifier *sigtermNotifier_ = nullptr;
+#ifndef _WIN32
+    static int sighupFd[2];
+    static int sigtermFd[2];
+    static int sigintFd[2];
+    class QSocketNotifier *snInt = nullptr;
+    class QSocketNotifier *snTerm = nullptr;
+#endif
 };
