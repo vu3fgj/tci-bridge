@@ -1,4 +1,3 @@
-// SignalHandler.h
 #pragma once
 
 #include <QObject>
@@ -9,16 +8,16 @@ public:
     explicit SignalHandler(QObject *parent = nullptr);
     ~SignalHandler() override;
 
-    static void setupSignalHandlers();
+    static SignalHandler *install(QObject *parent = nullptr);
 
 signals:
-    void quitRequested();
+    void interruptReceived();
+    void terminateReceived();
 
 private:
 #ifndef _WIN32
-    static int sighupFd[2];
-    static int sigtermFd[2];
     static int sigintFd[2];
+    static int sigtermFd[2];
     class QSocketNotifier *snInt = nullptr;
     class QSocketNotifier *snTerm = nullptr;
 #endif
