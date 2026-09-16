@@ -1,0 +1,48 @@
+name: Build Windows Release
+
+on:
+  workflow_dispatch: # Allows manual trigger from the GitHub web interface
+  push:
+
+jobs:
+  build:
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Qt6
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: '6.6.*'
+          host: 'windows'
+          target: 'desktop'
+          arch: 'win64_msvc2022_64'
+          modules: 'qtmultimedia qtwebsockets'
+
+      - name: Install vcpkg dependencies (yaml-cpp)
+        run: |
+          vcpkg install yaml-cpp:x64-windows
+
+      - name: Configure CMake
+        run: |
+          cmake -B build `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DCMAKE_PREFIX_PATH="$env:Qt6_DIR"
+
+      - name: Build Binary
+        run: |
+          cmake --build build --config Release
+
+      - name: Gather DLLs with windeployqt
+        run: |
+          $binDir = "build/Release"
+          windeployqt --release "$binDir/tci-bridge.exe"
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tci-bridge-windows-x64
+          path: build/Release/
