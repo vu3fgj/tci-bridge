@@ -12,16 +12,22 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Install Qt6
         uses: jurplel/install-qt-action@v4
         with:
-          version: '6.7.2'
+          version: '6.8.0'
           host: 'windows'
           target: 'desktop'
           arch: 'win64_msvc2022_64'
           modules: 'qtmultimedia qtwebsockets'
+          setup-python: false
 
-      - name: Install vcpkg dependencies (yaml-cpp)
+      - name: Install vcpkg dependencies
         run: |
           vcpkg install yaml-cpp:x64-windows
 
@@ -30,7 +36,7 @@ jobs:
           cmake -B build `
             -DCMAKE_BUILD_TYPE=Release `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
-            -DCMAKE_PREFIX_PATH="$env:Qt6_DIR"
+            -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR"
 
       - name: Build Binary
         run: |
@@ -39,7 +45,7 @@ jobs:
       - name: Gather DLLs with windeployqt
         run: |
           $binDir = "build/Release"
-          & "$env:Qt6_DIR/bin/windeployqt.exe" --release "$binDir/tci-bridge.exe"
+          & "$env:QT_ROOT_DIR/bin/windeployqt.exe" --release "$binDir/tci-bridge.exe"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
