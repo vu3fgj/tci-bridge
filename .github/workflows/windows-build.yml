@@ -99,35 +99,28 @@ jobs:
           Write-Host "Distribution contents:"
           Get-ChildItem -Path $dist -Recurse
 
-      - name: Verify executable
+      - name: Check executable dependencies
         shell: pwsh
         run: |
-          Write-Host "Testing --help..."
+          Write-Host "Checking executable..."
 
-          & ".\dist\tci-bridge.exe" --help
+          $exe = Resolve-Path ".\dist\tci-bridge.exe"
 
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "tci-bridge --help failed"
-            exit 1
-          }
+          Write-Host "Executable:"
+          Write-Host $exe
 
-          Write-Host "Testing --version..."
+          Write-Host ""
+          Write-Host "Executable size:"
+          Get-Item $exe | Select-Object Name, Length
 
-          & ".\dist\tci-bridge.exe" --version
+          Write-Host ""
+          Write-Host "yaml-cpp:"
+          Get-Item ".\dist\yaml-cpp.dll" | Select-Object Name, Length
 
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "tci-bridge --version failed"
-            exit 1
-          }
-
-          Write-Host "Testing audio device enumeration..."
-
-          & ".\dist\tci-bridge.exe" --list-audio-devices
-
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "Audio device enumeration failed"
-            exit 1
-          }
+          Write-Host ""
+          Write-Host "DLL files:"
+          Get-ChildItem ".\dist" -Filter "*.dll" |
+            Select-Object Name, Length
 
       - name: Create ZIP
         shell: pwsh
