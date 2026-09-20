@@ -25,38 +25,48 @@ jobs:
           cache: true
 
       - name: Install yaml-cpp
+        shell: pwsh
         run: |
           git clone --depth 1 https://github.com/microsoft/vcpkg.git C:\vcpkg
           C:\vcpkg\bootstrap-vcpkg.bat
           C:\vcpkg\vcpkg.exe install yaml-cpp:x64-windows
 
       - name: Configure
+        shell: pwsh
         run: |
           cmake -S . -B build `
             -G "Visual Studio 17 2022" `
             -A x64 `
             -DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake `
-            -DCMAKE_PREFIX_PATH="$env:Qt6_DIR\.."
+            -DCMAKE_PREFIX_PATH="$env:Qt6_DIR\.." `
+            -DCMAKE_EXE_LINKER_FLAGS="/SUBSYSTEM:CONSOLE"
 
       - name: Build
+        shell: pwsh
         run: |
           cmake --build build --config Release
 
-      - name: Deploy Qt DLLs
+      - name: Prepare distribution
         shell: pwsh
         run: |
           $exe = Get-ChildItem -Path build -Filter "tci-bridge.exe" -Recurse |
-                 Select-Object -First 1 -ExpandProperty FullName
+            Select-Object -First 1 -ExpandProperty FullName
 
           if (-not $exe) {
             Write-Error "tci-bridge.exe was not found"
             exit 1
           }
 
+          Write-Host "Found executable:"
+          Write-Host $exe
+
           $dist = "dist"
+
           New-Item -ItemType Directory -Force $dist | Out-Null
 
           Copy-Item $exe "$dist\tci-bridge.exe"
+
+          Write-Host "Deploying Qt dependencies..."
 
           & windeployqt `
             --release `
@@ -64,7 +74,60 @@ jobs:
             --no-translations `
             "$dist\tci-bridge.exe"
 
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "windeployqt failed"
+            exit 1
+          }
+
+          Write-Host "Copying yaml-cpp runtime..."
+
+          $yamlCpp = "C:\vcpkg\installed\x64-windows\bin\yaml-cpp.dll"
+
+          if (Test-Path $yamlCpp) {
+            Copy-Item $yamlCpp "$dist\yaml-cpp.dll"
+            Write-Host "yaml-cpp.dll copied."
+          }
+          else {
+            Write-Error "yaml-cpp.dll was not found at $yamlCpp"
+            exit 1
+          }
+
+          Write-Host "Copying configuration..."
+
           Copy-Item "examples\tci-bridge.yml" "$dist\tci-bridge.yml"
+
+          Write-Host "Distribution contents:"
+          Get-ChildItem -Path $dist -Recurse
+
+      - name: Verify executable
+        shell: pwsh
+        run: |
+          Write-Host "Testing --help..."
+
+          & ".\dist\tci-bridge.exe" --help
+
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "tci-bridge --help failed"
+            exit 1
+          }
+
+          Write-Host "Testing --version..."
+
+          & ".\dist\tci-bridge.exe" --version
+
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "tci-bridge --version failed"
+            exit 1
+          }
+
+          Write-Host "Testing audio device enumeration..."
+
+          & ".\dist\tci-bridge.exe" --list-audio-devices
+
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Audio device enumeration failed"
+            exit 1
+          }
 
       - name: Create ZIP
         shell: pwsh
@@ -73,6 +136,9 @@ jobs:
             -Path "dist\*" `
             -DestinationPath "tci-bridge-windows-x64.zip" `
             -Force
+
+          Write-Host "Created:"
+          Get-Item "tci-bridge-windows-x64.zip"
 
       - name: Upload Windows build
         uses: actions/upload-artifact@v4
